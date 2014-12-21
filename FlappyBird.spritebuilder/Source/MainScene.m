@@ -217,7 +217,7 @@
         if (bushScreenPosition.x <= (-1 * bush.contentSize.width)) {
             for (CGPointObject *child in _parallaxBackground.parallaxArray){
                 if (child.child == bush) {
-                    bush.position = ccp(child.offset.x + 2 * bush.contentSize.width, child.offset.y);
+                    child.offset = ccp(child.offset.x + 2 * bush.contentSize.width, child.offset.y);
                 }
             }
         }
