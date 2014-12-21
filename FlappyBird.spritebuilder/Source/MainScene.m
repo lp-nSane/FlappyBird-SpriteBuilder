@@ -9,6 +9,18 @@
 #import "MainScene.h"
 #import "Obstacle.h"
 
+@interface CGPointObject : NSObject {
+    CGPoint _ratio;
+    CGPoint _offset;
+    CCNode *__unsafe_unretained _child; //weak ref
+}
+@property (nonatomic,readwrite) CGPoint ratio;
+@property (nonatomic, readwrite) CGPoint offset;
+@property (nonatomic, readwrite, unsafe_unretained) CCNode *child;
++(id) pointWithCGPoint:(CGPoint)point offset:(CGPoint)offset;
+-(id) initWithCGPoint:(CGPoint)point offset:(CGPoint)offset;
+@end
+
 @implementation MainScene {
     CCNode *_ground1;
     CCNode *_ground2;
@@ -21,6 +33,12 @@
     CCNode *_bush1;
     CCNode *_bush2;
     NSArray *_bushes;
+    
+    CGPoint _cloudParallaxRatio;
+    CGPoint _bushParallaxRatio;
+    
+    CCNode *_parallaxContainer;
+    CCParallaxNode *_parallaxBackground;
     
     NSTimeInterval _sinceTouch;
     
@@ -43,6 +61,24 @@
     _clouds = @[_cloud1, _cloud2];
     _bushes = @[_bush1, _bush2];
     
+    _parallaxBackground = [CCParallaxNode node];
+    [_parallaxBackground addChild:_parallaxBackground];
+    
+    _bushParallaxRatio = ccp(0.9, 1);
+    _cloudParallaxRatio = ccp(0.5, 1);
+    
+    for (CCNode *bush in _bushes) {
+        CGPoint offset = bush.position;
+        [self removeChild:bush];
+        [_parallaxBackground addChild:bush z:0 parallaxRatio:_bushParallaxRatio positionOffset:offset];
+    }
+    
+    for (CCNode *cloud in _clouds) {
+        CGPoint offset = cloud.position;
+        [self removeChild:cloud];
+        [_parallaxBackground addChild:cloud z:0 parallaxRatio:_cloudParallaxRatio positionOffset:offset];
+    }
+    
     for (CCNode *ground in _grounds) {
         // set collision txpe
         ground.physicsBody.collisionType = @"level";
@@ -61,7 +97,7 @@
 
 #pragma mark - Touch Handling
 
-- (void)touchBegan:(UITouch *)touch withEvent:(UIEvent *)event {
+- (void)touchBegan:(CCTouch *)touch withEvent:(CCTouchEvent *)event {
     if (!_gameOver) {
         [character.physicsBody applyAngularImpulse:10000.f];
         _sinceTouch = 0.f;
@@ -172,17 +208,31 @@
         [_obstacles removeObject:obstacleToRemove];
     }
     
+    _parallaxBackground.position = ccp(_parallaxBackground.position.x - (character.physicsBody.velocity.x * delta), _parallaxBackground.position.y);
+    
     for(CCNode *bush in _bushes) {
-        bush.position = ccp(bush.position.x - (character.physicsBody.velocity.x * delta), bush.position.y);
-        if (bush.position.x <= (-1 * bush.contentSize.width)) {
-            bush.position = ccp(bush.position.x + 2 * bush.contentSize.width, bush.position.y);
+        CGPoint bushWorldPosition = [_parallaxBackground convertToWorldSpace:bush.position];
+        CGPoint bushScreenPosition = [self convertToNodeSpace:bushWorldPosition];
+        
+        if (bushScreenPosition.x <= (-1 * bush.contentSize.width)) {
+            for (CGPointObject *child in _parallaxBackground.parallaxArray){
+                if (child.child == bush) {
+                    bush.position = ccp(child.offset.x + 2 * bush.contentSize.width, child.offset.y);
+                }
+            }
         }
     }
     
     for (CCNode *cloud in _clouds) {
-        cloud.position = ccp(cloud.position.x - (character.physicsBody.velocity.x * delta), cloud.position.y);
-        if (cloud.position.x <= (-1 * cloud.contentSize.width)) {
-            cloud.position = ccp(cloud.position.x + 2 * cloud.contentSize.width, cloud.position.y);
+        CGPoint cloudWorldPosition = [_parallaxBackground convertToWorldSpace:cloud.position];
+        CGPoint cloudScreenPosition = [self convertToNodeSpace:cloudWorldPosition];
+        
+        if (cloudScreenPosition.x <= (-1 * cloud.contentSize.width)) {
+            for (CGPointObject *child in _parallaxBackground.parallaxArray) {
+                if (child.child == cloud) {
+                    child.offset = ccp(child.offset.x + 2*cloud.contentSize.width, child.offset.y);
+                }
+            }
         }
     }
     
